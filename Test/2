@@ -1,0 +1,56 @@
+-- Auto Farm + Aimbot + UI for Dead Rails -- Made by yourlieinoct
+
+-- SERVICES local Players = game:GetService("Players") local RunService = game:GetService("RunService") local UserInputService = game:GetService("UserInputService") local LocalPlayer = Players.LocalPlayer local Camera = workspace.CurrentCamera
+
+-- CHARACTER REFERENCES local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait() local Humanoid = Character:WaitForChild("Humanoid") local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- SETTINGS local fov = 136 local isAiming = false local autoBond = false local showExtra = false local unlockFOV = false local walkSpeed = 16 local validNPCs = {}
+
+-- FOV CIRCLE local FOVCircle = Drawing.new("Circle") FOVCircle.Visible = false FOVCircle.Radius = fov FOVCircle.Thickness = 2 FOVCircle.Filled = false FOVCircle.Color = Color3.fromRGB(128, 0, 128) FOVCircle.Position = Camera.ViewportSize / 2
+
+-- GUI SETUP local gui = Instance.new("ScreenGui", game.CoreGui) local function createButton(name, text, position, parent, callback) local button = Instance.new("TextButton") button.Name = name button.Text = text button.Size = UDim2.new(0, 160, 0, 40) button.Position = position button.BackgroundColor3 = Color3.fromRGB(50, 50, 50) button.TextColor3 = Color3.fromRGB(255, 255, 255) button.Font = Enum.Font.GothamBold button.TextSize = 14 button.Parent = parent button.MouseButton1Click:Connect(function() callback(button) end) return button end
+
+-- EXTRA PANEL local extraPanel = Instance.new("Frame", gui) extraPanel.Size = UDim2.new(0, 200, 0, 120) extraPanel.Position = UDim2.new(0, 180, 0, 10) extraPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 25) extraPanel.Visible = false
+
+-- MAIN BUTTONS createButton("Aimbot", "AIMBOT: OFF", UDim2.new(0, 10, 0, 10), gui, function(btn) isAiming = not isAiming btn.Text = "AIMBOT: " .. (isAiming and "ON" or "OFF") FOVCircle.Visible = isAiming end)
+
+createButton("AutoBond", "AUTO BOND: OFF", UDim2.new(0, 10, 0, 60), gui, function(btn) autoBond = not autoBond btn.Text = "AUTO BOND: " .. (autoBond and "ON" or "OFF") end)
+
+createButton("ToggleExtra", "EXTRA: OFF", UDim2.new(0, 10, 0, 110), gui, function(btn) showExtra = not showExtra btn.Text = "EXTRA: " .. (showExtra and "ON" or "OFF") extraPanel.Visible = showExtra end)
+
+-- EXTRA BUTTON createButton("FOVToggle", "FOV UNLOCK: OFF", UDim2.new(0, 10, 0, 10), extraPanel, function(btn) unlockFOV = not unlockFOV btn.Text = "FOV UNLOCK: " .. (unlockFOV and "ON" or "OFF") end)
+
+-- SLIDER FOR WALKSPEED local sliderFrame = Instance.new("Frame", extraPanel) sliderFrame.Size = UDim2.new(0, 180, 0, 40) sliderFrame.Position = UDim2.new(0, 10, 0, 70) sliderFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+
+local bar = Instance.new("Frame", sliderFrame) bar.Size = UDim2.new(1, 0, 0, 5) bar.Position = UDim2.new(0, 0, 0.5, -2) bar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+
+local dot = Instance.new("Frame", sliderFrame) dot.Size = UDim2.new(0, 10, 0, 20) dot.Position = UDim2.new(0, 0, 0, 10) dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+
+local dragging = false local function updateSpeed(x) local rel = math.clamp((x - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1) dot.Position = UDim2.new(rel, -5, 0, 10) walkSpeed = math.floor(1 + rel * 199) Humanoid.WalkSpeed = walkSpeed end
+
+sliderFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true updateSpeed(input.Position.X) end end)
+
+UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then updateSpeed(input.Position.X) end end)
+
+UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+
+-- FUNCTIONS local function isBond(item) return item:IsA("BasePart") and item.Name:lower():find("bond") end
+
+local function findNearestBond() local closest, minDist = nil, math.huge for _, obj in ipairs(workspace:GetDescendants()) do if isBond(obj) then local dist = (obj.Position - RootPart.Position).Magnitude if dist < minDist then closest, minDist = obj, dist end end end return closest end
+
+local function collectBond(bond) if bond then Character:MoveTo(bond.Position + Vector3.new(0, 2, 0)) firetouchinterest(RootPart, bond, 0) firetouchinterest(RootPart, bond, 1) end end
+
+local function predictPos(npc) local root = npc:FindFirstChild("HumanoidRootPart") local head = npc:FindFirstChild("Head") if root and head then return root.Position + (head.Position - root.Position) + root.Velocity * 0.02 end end
+
+local function getTarget() local closest, dist = nil, math.huge local center = Camera.ViewportSize / 2 for _, npc in ipairs(validNPCs) do local pos = predictPos(npc) if pos then local screen, onScreen = Camera:WorldToViewportPoint(pos) if onScreen then local d = (Vector2.new(screen.X, screen.Y) - center).Magnitude if d < dist and d < fov then closest, dist = npc, d end end end end return closest end
+
+local function aimAt(pos) local cf = Camera.CFrame local dir = (pos - cf.Position).Unit Camera.CFrame = CFrame.new(cf.Position, cf.Position + cf.LookVector:Lerp(dir, 0.6)) end
+
+-- HEARTBEAT LOOP RunService.Heartbeat:Connect(function() if isAiming then local target = getTarget() if target then local pos = predictPos(target) if pos then aimAt(pos) end end end if autoBond then local bond = findNearestBond() if bond then collectBond(bond) end end if unlockFOV then FOVCircle.Radius = fov * (Camera.ViewportSize.Y / 1080) FOVCircle.Position = Camera.ViewportSize / 2 end end)
+
+-- UPDATE NPC LIST local function isNPC(obj) return obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") end
+
+local function refreshNPCs() validNPCs = {} for _, obj in ipairs(workspace:GetDescendants()) do if isNPC(obj) then table.insert(validNPCs, obj) end end end
+
+refreshNPCs() workspace.DescendantAdded:Connect(function(obj) if isNPC(obj) then table.insert(validNPCs, obj) end end)
+
